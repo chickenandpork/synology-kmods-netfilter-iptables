@@ -1,0 +1,68 @@
+---
+name: Release
+# yamllint disable-line rule:truthy
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: true
+      matrix:
+        arch:
+          - denverton
+          # - geminilake
+    name: build ${{ matrix.arch }} kernel modules
+    steps:
+      - name: Clone Repo
+        uses: actions/checkout@v4
+      - name: Kernel configure and build
+        uses: chickenandpork/synology-docker-kernel-action@master
+        id: build
+        with:
+          artifacts: net/ipv4/netfilter/ipt_REJECT.ko net/ipv4/netfilter/nf_reject_ipv4.ko net/netfilter/xt_comment.ko
+          dsm-version: '7.2'
+          module-deactivate: CONFIG_NFSD CONFIG_NFS_FS
+          module-modularize: CONFIG_IP_NF_TARGET_REJECT CONFIG_NETFILTER_XT_MATCH_COMMENT
+          package-arch: ${{ matrix.arch }}
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          if-no-files-found: error
+          path: ${{ github.workspace }}/${{ steps.build.outputs.archive }}
+          retention-days: 7
+
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    needs: [build]
+    steps:
+      - uses: google-github-actions/release-please-action@v4
+        # Settings -> Actions -> General -> Workflow Permissions
+        # - select "Read repo contents", and
+        # - enable "Allow Github Actions to create and approve pull requests"
+        id: release
+        with:
+          release-type: simple
+      - name: Clone Repo
+        if: ${{ steps.release.outputs.release_created }}
+        uses: actions/checkout@v4
+      - name: Download artifacts
+        id: download
+        if: ${{ steps.release.outputs.release_created }}
+        uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+      - name: Upload Release Artifacts
+        if: ${{ steps.release.outputs.release_created }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ls -al
+          echo download is ${{ steps.download.outputs.download-path }}
+          gh release upload ${{ steps.release.outputs.tag_name }} [a-z]*-[0-9].*.txz  # ie denverton-7.2.txz
