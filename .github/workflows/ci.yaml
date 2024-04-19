@@ -1,0 +1,39 @@
+---
+name: CI
+# yamllint disable-line rule:truthy
+on:
+  push:
+    branches-ignore:
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+          - denverton
+          # - geminilake
+    name: build ${{ matrix.arch }} kernel modules
+    steps:
+      - name: Clone Repo
+        uses: actions/checkout@v4
+      - name: Kernel configure and build
+        uses: chickenandpork/synology-docker-kernel-action@master
+        id: build
+        with:
+          artifacts: net/ipv4/netfilter/ipt_REJECT.ko net/ipv4/netfilter/nf_reject_ipv4.ko net/netfilter/xt_comment.ko
+          dsm-version: '7.2'
+          module-deactivate: CONFIG_NFSD CONFIG_NFS_FS
+          module-modularize: CONFIG_IP_NF_TARGET_REJECT CONFIG_NETFILTER_XT_MATCH_COMMENT
+          package-arch: ${{ matrix.arch }}
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          if-no-files-found: error
+          path: ${{ github.workspace }}/${{ steps.build.outputs.archive }}
+          retention-days: 7
+      - name: Debug Info
+        run: |
+          ls -al .
