@@ -18,7 +18,7 @@ jobs:
     name: build ${{ matrix.arch }} kernel modules
     steps:
       - name: Clone Repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Kernel configure and build
         uses: chickenandpork/synology-docker-kernel-action@d6b84a82df72f64d8eb87d2741d8e7c8bb8233ee
         id: build
